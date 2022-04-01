@@ -70,6 +70,7 @@
   "Get concatenated test name for tests surrounding current point"
   (mapconcat #'cadr (jest-ts-tests-at-point) " "))
 
+;;;###autoload
 (defun jest-ts-run-test-at-point (arg)
   "Run the test at point"
   (interactive "P")
