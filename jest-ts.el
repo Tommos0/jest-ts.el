@@ -82,6 +82,8 @@
          (test-string (jest-ts--test-string-at-point)))
 
      (with-current-buffer buffer
+       (setq buffer-read-only nil)
+       (erase-buffer)
        (term-mode)
        (term-exec buffer "jest" "yarn" nil
                   `("jest"
