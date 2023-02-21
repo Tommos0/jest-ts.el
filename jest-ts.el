@@ -70,6 +70,21 @@
   "Get concatenated test name for tests surrounding current point"
   (mapconcat #'cadr (jest-ts-tests-at-point) " "))
 
+(defun jest-ts--jest-path ()
+  "Get the current jest path by running yarn which jest"
+  (replace-regexp-in-string "\n$" "" (shell-command-to-string "yarn --silent which jest")))
+
+(defcustom jest-ts-extra-node-args '()
+  "Extra node arguments to pass to jest"
+  :type 'list
+  :group 'jest-ts)
+
+(defun jest-ts-toggle-debug ()
+  (interactive)
+  (setq jest-ts-extra-node-args (if jest-ts-extra-node-args
+                                    nil
+                                  '("--inspect-brk"))))
+
 ;;;###autoload
 (defun jest-ts-run-test-at-point (arg)
   "Run the test at point"
@@ -82,18 +97,19 @@
          (file-name (buffer-file-name))
          (test-string (jest-ts--test-string-at-point)))
 
-     (with-current-buffer buffer
-       (setq buffer-read-only nil)
-       (erase-buffer)
-       (term-mode)
-       (term-exec buffer "jest" "yarn" nil
-                  `("jest"
-                    "--color"
-                    ,@(when arg '("--watch"))
-                    "--testNamePattern"
-                    ,test-string
-                    ,file-name))
-       (term-char-mode))
+    (with-current-buffer buffer
+      (setq buffer-read-only nil)
+      (erase-buffer)
+      (term-mode)
+      (term-exec buffer "jest" "node" nil
+                 `(,@jest-ts-extra-node-args
+                   ,(jest-ts--jest-path)
+                   "--color"
+                   ,@(when arg '("--watch"))
+                   "--testNamePattern"
+                   ,test-string
+                   ,file-name))
+      (term-char-mode))
     (display-buffer buffer)))
 
 (provide 'jest-ts)
