@@ -72,7 +72,7 @@
 
 (defun jest-ts--jest-path ()
   "Get the current jest path by running yarn which jest"
-  (replace-regexp-in-string "\n$" "" (shell-command-to-string "yarn --silent which jest")))
+  (replace-regexp-in-string "\n$" "" (shell-command-to-string "yarn bin jest")))
 
 (defcustom jest-ts-extra-node-args '()
   "Extra node arguments to pass to jest"
