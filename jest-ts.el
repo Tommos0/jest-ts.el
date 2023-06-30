@@ -18,57 +18,44 @@
 ;;  Description
 ;;
 ;;; Code:
-(require 'tree-sitter)
-(require 'tree-sitter-langs)
+;(require 'tree-sitter)
+;(require 'tree-sitter-langs)
 (require 'term)
 
 (defcustom jest-ts-query-sexp
-  '((call_expression [(identifier) (member_expression)]
-                     @identifier (.match? @identifier "^(describe|^it|^test)")
-                     (arguments [(string) (template_string)] @test-name
-                                [(arrow_function) (function)])) @contents)
-  "The tree-sitter query to use for finding jest tests"
+  '((call_expression
+     function: [(identifier) (member_expression)]
+     @function-name (:match "^\\(describe\\|it\\).*" @function-name)
+     arguments: (arguments ([(string (string_fragment) @test-name)
+			     (template_string) @test-name]))) @outer)
+
+  "The tree-sitter query to use for finding jest tests."
   :type 'sexp
   :group 'jest-ts)
-
-(defun jest-ts--create-parser (language)
-  "Create a new parser and set language to language"
-  (let ((parser (tsc-make-parser)))
-    (tsc-set-language parser (tree-sitter-require language))
-    parser))
-
-(defun jest-ts--parse-string (string query-sexp language)
-  "Parse string using query-sexp in language"
-  (let* ((parser (jest-ts--create-parser language))
-         (tree (tsc-parse-string parser string))
-         (root-node (tsc-root-node tree))
-         (query (tsc-make-query (tree-sitter-require language)
-                                query-sexp)))
-    (tsc-query-captures query root-node #'tsc--buffer-substring-no-properties)))
 
 (defun jest-ts--unquote (string)
   "Removes quotes from beginning and end of string"
   (replace-regexp-in-string "[\"`']?\\(.*?\\)[\"`']?$" "\\1" string))
 
-(defun jest-ts-tests ()
+(defun jest-ts--tests ()
   "Get the jest tests defined in the current buffer"
-  (let* ((buffer-text (buffer-substring-no-properties (point-min) (point-max)))  
-         (query-result (jest-ts--parse-string buffer-text jest-ts-query-sexp 'typescript))
-         (match-tuples (seq-partition (append query-result nil) 3)))
-    (mapcar (lambda (test)
-              (list (tsc-node-position-range (alist-get 'contents test))
-                    (jest-ts--unquote (tsc-node-text (alist-get 'test-name test)))))
-            match-tuples)))
+  (let* ((captures (treesit-query-capture (treesit-buffer-root-node) jest-ts-query-sexp)))
+    (mapcar (lambda (group)
+	  (list (treesit-node-start (alist-get 'outer group))
+		(treesit-node-end (alist-get 'outer group))
+		(jest-ts--unquote (substring-no-properties
+				   (treesit-node-text (alist-get 'test-name group))))))
+        (seq-partition captures 3))))
 
 (defun jest-ts-tests-at-point ()
   "Get tests surrounding current point"
-  (seq-filter (lambda (test) (and (>= (point) (caar test))
-                                  (<= (point) (cdar test))))
-              (jest-ts-tests)))
+  (seq-filter (lambda (test) (and (>= (point) (car test))
+                             (<= (point) (cadr test))))
+              (jest-ts--tests)))
 
 (defun jest-ts--test-string-at-point ()
   "Get concatenated test name for tests surrounding current point"
-  (mapconcat #'cadr (jest-ts-tests-at-point) " "))
+  (mapconcat #'caddr (jest-ts-tests-at-point) " "))
 
 (defun jest-ts--jest-path ()
   "Get the current jest path by running yarn which jest"
